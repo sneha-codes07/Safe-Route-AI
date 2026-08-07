@@ -7,21 +7,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/* Global full-viewport LineWaves — sits beneath everything */}
-      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#081229]">
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#0a0010]">
         <LineWaves
-          speed={0.25}
-          innerLineCount={28}
-          outerLineCount={32}
-          warpIntensity={0.8}
-          rotation={-35}
-          edgeFadeWidth={0.1}
-          colorCycleSpeed={0.6}
-          brightness={0.18}
-          color1="#3b82f6"
-          color2="#1e3a8a"
-          color3="#0f172a"
+          speed={0.3}
+          innerLineCount={32}
+          outerLineCount={36}
+          warpIntensity={1.0}
+          rotation={-45}
+          edgeFadeWidth={0.0}
+          colorCycleSpeed={1.0}
+          brightness={0.28}
+          color1="#e00000"
+          color2="#ff0000"
+          color3="#38078b"
           enableMouseInteraction={true}
-          mouseInfluence={1.4}
+          mouseInfluence={2.0}
         />
       </div>
       <Navbar />
