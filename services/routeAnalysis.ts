@@ -3,14 +3,21 @@
 import { getModel } from "../lib/gemini";
 import { parseGeminiResponse } from "../lib/parser";
 import { validateAndMapResponse } from "../lib/validator";
-import { RouteAnalysis } from "@/types/route";
+import { routeQuerySchema } from "../lib/schemas";
+import type { RouteAnalysis } from "@/types/route";
 
-const SYSTEM_PROMPT = `You are SafeRoute AI. You are an intelligent travel-risk analysis engine.
-Your responsibility is to convert natural-language travel requests into structured flood-aware travel guidance.
-You never answer conversationally. You never return markdown. You never explain outside JSON.
-Always return valid JSON. If information is missing, infer reasonable values while lowering confidence.
+const ROUTE_ANALYSIS_TIMEOUT_MS = 25_000;
 
-Always return exactly this structure:
+const SYSTEM_PROMPT = `You are SafeRoute AI — an intelligent flood-aware travel risk engine.
+Convert natural-language travel requests into structured, actionable flood risk guidance.
+
+STRICT RULES:
+- Return ONLY valid JSON. No markdown. No explanation outside JSON.
+- If information is ambiguous, infer reasonable values and lower the confidence score.
+- floodRisk must be exactly one of: "Safe", "Moderate", "High", "Critical"
+- confidence must be an integer 0-100
+
+Return exactly this JSON structure (no extra fields):
 {
   "origin": "",
   "destination": "",
@@ -25,70 +32,115 @@ Always return exactly this structure:
   "reasoning": "",
   "safetyTips": [],
   "timeline": [
-    {
-      "title": "",
-      "status": ""
-    }
+    { "title": "", "status": "" }
   ]
-}
+}`;
 
-Never include additional fields.`;
+/**
+ * Server Action: analyzes a flood-aware travel route using Gemini AI.
+ *
+ * Input is validated and sanitized before reaching the model.
+ * The response is parsed, Zod-validated, and mapped to a typed RouteAnalysis.
+ * Errors are categorized and sanitized before returning to the client.
+ */
+export async function analyzeRouteAction(
+  rawQuery: string
+): Promise<{ success: boolean; data?: RouteAnalysis; error?: string }> {
+  // ── 1. Validate + sanitize user input ──────────────────────────────────────
+  const queryResult = routeQuerySchema.safeParse(rawQuery);
+  if (!queryResult.success) {
+    return {
+      success: false,
+      error: queryResult.error.issues[0]?.message ?? "Invalid input.",
+    };
+  }
+  const query = queryResult.data;
 
-export async function analyzeRouteAction(query: string): Promise<{ success: boolean; data?: RouteAnalysis; error?: string }> {
+  // ── 2. Abort controller for clean cancellation ────────────────────────────
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ROUTE_ANALYSIS_TIMEOUT_MS);
+
   try {
     const model = getModel();
-    
-    // Setup timeout controller
+
     const fetchPromise = model.generateContent({
-      contents: [
-        { role: "user", parts: [{ text: query }] }
-      ],
+      contents: [{ role: "user", parts: [{ text: query }] }],
       systemInstruction: {
         role: "system",
-        parts: [{ text: SYSTEM_PROMPT }]
+        parts: [{ text: SYSTEM_PROMPT }],
       },
       generationConfig: {
-        temperature: 0.2, // low temp for structured mapping
-      }
+        temperature: 0.2, // low temperature for deterministic structured output
+        maxOutputTokens: 1024,
+      },
     });
 
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Gemini API timeout")), 25000)
-    );
+    // Race against AbortController timeout
+    const result = await Promise.race([
+      fetchPromise,
+      new Promise<never>((_, reject) =>
+        controller.signal.addEventListener("abort", () =>
+          reject(new Error("Gemini API timeout after 25s"))
+        )
+      ),
+    ]);
 
-    // Race the API call against a 25s timeout (Server Actions usually cap at 10-30s depending on hosting)
-    const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
+    clearTimeout(timeoutId);
 
     const rawText = result.response.text();
-    
-    // Parse JSON
+
+    // ── 3. Parse JSON ─────────────────────────────────────────────────────────
     const parsedData = parseGeminiResponse(rawText);
-    
-    // Validate & Map
-    // We derive basic origin/destination broadly for fallback just in case the AI missed it completely.
+
+    // ── 4. Extract fallback context from the sanitized query ─────────────────
+    const words = query.split(/\s+/);
+    const fromIdx = words.findIndex((w) => /^(from|leaving)$/i.test(w));
+    const toIdx = words.findIndex((w) => /^(to|toward|towards|reaching)$/i.test(w));
     const fallbackContext = {
-      origin: "Origin", 
-      destination: "Destination" 
+      origin: fromIdx !== -1 ? words.slice(fromIdx + 1, fromIdx + 3).join(" ") : "Origin",
+      destination: toIdx !== -1 ? words.slice(toIdx + 1, toIdx + 3).join(" ") : "Destination",
     };
 
+    // ── 5. Validate + map to domain type ─────────────────────────────────────
     const finalData = validateAndMapResponse(parsedData, fallbackContext);
-    
-    return { success: true, data: finalData };
-  } catch (error: any) {
-    // We only log the detailed error severely internally. The client receives a generic error.
-    if (process.env.NODE_ENV === "development") {
-      console.error("\n[SafeRoute AI Debug] Gemini Route Analysis Extracted Error:");
-      console.error(error?.message || error);
-      console.error("Stack trace:", error?.stack);
-      console.error("Phase:", error?.message?.includes("API key") ? "Initialization" : error?.message?.includes("JSON") ? "Parsing" : "Network/Execution");
-      console.error("--------------------------------------------------\n");
-    }
-    
-    let userMessage = "An unexpected error occurred during AI analysis.";
-    if (error?.message?.includes("API key")) userMessage = "API Key configuration error.";
-    else if (error?.message?.includes("JSON") || error?.message?.includes("Malformed")) userMessage = "Received malformed data from AI.";
-    else if (error?.message?.includes("timeout")) userMessage = "AI service took too long to respond.";
 
-    return { success: false, error: userMessage };
+    return { success: true, data: finalData };
+  } catch (error: unknown) {
+    clearTimeout(timeoutId);
+
+    // Log detailed error server-side only
+    if (process.env.NODE_ENV !== "production") {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      console.error("\n[SafeRoute AI] Route Analysis Error");
+      console.error("Message:", msg);
+      console.error("Phase:", classifyErrorPhase(msg));
+      if (stack) console.error("Stack:", stack);
+      console.error("─".repeat(60) + "\n");
+    }
+
+    return { success: false, error: classifyUserError(error) };
   }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function classifyErrorPhase(message: string): string {
+  if (message.includes("API key")) return "Initialization";
+  if (message.includes("JSON") || message.includes("Malformed") || message.includes("Invalid AI")) return "Parsing";
+  if (message.includes("timeout") || message.includes("abort")) return "Network/Timeout";
+  return "Execution";
+}
+
+function classifyUserError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("Invalid input")) return message;
+  if (message.includes("API key")) return "API Key configuration error. Check server environment variables.";
+  if (message.includes("JSON") || message.includes("Malformed") || message.includes("Invalid AI"))
+    return "The AI returned an unexpected response format. Please try again.";
+  if (message.includes("timeout") || message.includes("abort"))
+    return "The AI took too long to respond. Please try again.";
+  if (message.includes("quota") || message.includes("rate"))
+    return "API rate limit reached. Please wait a moment and try again.";
+  return "An unexpected error occurred during AI analysis. Please try again.";
 }

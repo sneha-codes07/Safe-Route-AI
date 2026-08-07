@@ -1,30 +1,48 @@
-import { GeminiRouteAnalysis } from "@/types/ai";
+import { geminiRouteAnalysisSchema, type GeminiRouteAnalysisSchema } from "./schemas";
+import type { GeminiRouteAnalysis } from "@/types/ai";
 
+/**
+ * Strips optional markdown code fences that Gemini occasionally wraps around
+ * its JSON output, then extracts the first JSON object literal found.
+ */
+function extractJson(rawText: string): string {
+  let text = rawText.trim();
+
+  // Remove ```json ... ``` or ``` ... ``` fences
+  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  // If there is still conversational wrap, pull out the first {...} block
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match) return match[0];
+
+  return text;
+}
+
+/**
+ * Parses the raw Gemini text response into a typed, Zod-validated object.
+ *
+ * Throws `Error("Malformed JSON response from AI")` if the text cannot be
+ * parsed as JSON, or `Error("Invalid AI response structure: ...")` if the
+ * parsed object fails schema validation.
+ */
 export function parseGeminiResponse(rawText: string): GeminiRouteAnalysis {
-  let textToParse = rawText.trim();
+  const textToParse = extractJson(rawText);
 
-  // Strip markdown code fences if Gemini ignores the prompt
-  if (textToParse.startsWith("```json")) {
-    textToParse = textToParse.replace(/^```json/, "").trim();
-  } else if (textToParse.startsWith("```")) {
-    textToParse = textToParse.replace(/^```/, "").trim();
-  }
-  
-  if (textToParse.endsWith("```")) {
-    textToParse = textToParse.replace(/```$/, "").trim();
-  }
-
-  // Fallback cleanup: try to extract JSON from the string using regex if there's conversational wrap
-  const jsonMatch = textToParse.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    textToParse = jsonMatch[0];
-  }
-
+  let parsed: unknown;
   try {
-    const data = JSON.parse(textToParse);
-    return data as GeminiRouteAnalysis;
-  } catch (err) {
-    console.error("Failed to parse Gemini response as JSON:", err);
+    parsed = JSON.parse(textToParse);
+  } catch {
     throw new Error("Malformed JSON response from AI");
   }
+
+  // Runtime validation — catches Gemini returning error objects or wrong shapes
+  const result = geminiRouteAnalysisSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
+    throw new Error(`Invalid AI response structure: ${issues}`);
+  }
+
+  return result.data as GeminiRouteAnalysis;
 }
