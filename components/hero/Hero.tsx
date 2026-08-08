@@ -32,13 +32,13 @@ export function Hero() {
           charset="alpha"
           flipsPerChar={6}
           tileColor="transparent"
-          textColor="#f0259a"
+          textColor="#38bdf8"
           tileRadius={6}
           gap={4}
           fontSize="clamp(1.75rem, 5vw, 4.5rem)"
           loop
           padTo={16}
-          style={{ fontWeight: 800, letterSpacing: "-0.02em", filter: "drop-shadow(0 0 18px #f0259aaa)" }}
+          style={{ fontWeight: 800, letterSpacing: "-0.02em", filter: "drop-shadow(0 0 22px rgba(56,189,248,0.65))" }}
         />
       </motion.div>
 

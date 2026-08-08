@@ -3,8 +3,6 @@
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 import { useEffect, useRef } from 'react';
 
-import './LineWaves.css';
-
 function hexToVec3(hex: string) {
   const h = hex.replace('#', '');
   return [
@@ -227,7 +225,7 @@ export default function LineWaves({
     container.appendChild(gl.canvas);
 
     if (enableMouseInteraction) {
-      gl.canvas.addEventListener('mousemove', handleMouseMove as any);
+      gl.canvas.addEventListener('mousemove', handleMouseMove);
       gl.canvas.addEventListener('mouseleave', handleMouseLeave);
     }
 
@@ -255,7 +253,7 @@ export default function LineWaves({
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', resize);
       if (enableMouseInteraction) {
-        gl.canvas.removeEventListener('mousemove', handleMouseMove as any);
+        gl.canvas.removeEventListener('mousemove', handleMouseMove);
         gl.canvas.removeEventListener('mouseleave', handleMouseLeave);
       }
       container.removeChild(gl.canvas);
@@ -263,5 +261,5 @@ export default function LineWaves({
     };
   }, [speed, innerLineCount, outerLineCount, warpIntensity, rotation, edgeFadeWidth, colorCycleSpeed, brightness, color1, color2, color3, enableMouseInteraction, mouseInfluence]);
 
-  return <div ref={containerRef} className="line-waves-container" />;
+  return <div ref={containerRef} className="w-full h-full" />;
 }

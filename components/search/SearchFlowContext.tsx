@@ -9,7 +9,7 @@ import React, {
   type ReactNode,
 } from "react";
 import type { RouteAnalysis } from "@/types/route";
-import { MOCK_ROUTE_ANALYSIS } from "@/lib/mockData";
+import { MOCK_ROUTE_ANALYSIS, getFallbackRouteAnalysis } from "@/lib/mockData";
 import { analyzeRouteAction } from "@/services/routeAnalysis";
 
 type FlowState = "idle" | "loading" | "results";
@@ -105,7 +105,7 @@ export function SearchFlowProvider({ children }: { children: ReactNode }) {
         if (process.env.NODE_ENV !== "production") {
           console.warn("[SafeRoute AI] AI analysis failed:", response.error, "→ falling back to mock data");
         }
-        setAnalysisData(MOCK_ROUTE_ANALYSIS);
+        setAnalysisData(getFallbackRouteAnalysis(currentQuery));
         setIsFallback(true);
       }
 
@@ -115,7 +115,7 @@ export function SearchFlowProvider({ children }: { children: ReactNode }) {
       if (process.env.NODE_ENV !== "production") {
         console.warn("[SafeRoute AI] Exception during analysis:", err);
       }
-      setAnalysisData(MOCK_ROUTE_ANALYSIS);
+      setAnalysisData(getFallbackRouteAnalysis(currentQuery));
       setIsFallback(true);
       setState("results");
     }

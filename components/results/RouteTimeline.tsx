@@ -22,7 +22,7 @@ export function RouteTimeline({ data }: { data: RouteAnalysis }) {
   };
 
   return (
-    <Card className="p-6 h-full">
+    <Card className="p-6">
       <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Live Timeline</h3>
       
       <div className="relative pl-3">

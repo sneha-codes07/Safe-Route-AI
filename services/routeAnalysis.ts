@@ -60,6 +60,7 @@ export async function analyzeRouteAction(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ROUTE_ANALYSIS_TIMEOUT_MS);
 
+  let rawText = "";
   try {
     const model = getModel();
 
@@ -72,6 +73,7 @@ export async function analyzeRouteAction(
       generationConfig: {
         temperature: 0.2, // low temperature for deterministic structured output
         maxOutputTokens: 1024,
+        responseMimeType: "application/json",
       },
     });
 
@@ -87,7 +89,7 @@ export async function analyzeRouteAction(
 
     clearTimeout(timeoutId);
 
-    const rawText = result.response.text();
+    rawText = result.response.text();
 
     // ── 3. Parse JSON ─────────────────────────────────────────────────────────
     const parsedData = parseGeminiResponse(rawText);
@@ -115,6 +117,9 @@ export async function analyzeRouteAction(
       console.error("\n[SafeRoute AI] Route Analysis Error");
       console.error("Message:", msg);
       console.error("Phase:", classifyErrorPhase(msg));
+      if (rawText) {
+        console.error("Raw AI Text:", rawText);
+      }
       if (stack) console.error("Stack:", stack);
       console.error("─".repeat(60) + "\n");
     }
@@ -135,12 +140,20 @@ function classifyErrorPhase(message: string): string {
 function classifyUserError(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("Invalid input")) return message;
-  if (message.includes("API key")) return "API Key configuration error. Check server environment variables.";
+  if (
+    message.includes("API key") ||
+    message.includes("401") ||
+    message.includes("Unauthorized") ||
+    message.includes("UNAUTHENTICATED") ||
+    message.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+  ) {
+    return "Invalid or missing Gemini API Key. Please set a valid GOOGLE_GENERATIVE_AI_API_KEY in .env.local.";
+  }
   if (message.includes("JSON") || message.includes("Malformed") || message.includes("Invalid AI"))
     return "The AI returned an unexpected response format. Please try again.";
   if (message.includes("timeout") || message.includes("abort"))
     return "The AI took too long to respond. Please try again.";
-  if (message.includes("quota") || message.includes("rate"))
+  if (message.includes("quota") || message.includes("429") || message.includes("RESOURCE_EXHAUSTED") || message.includes("rate limit"))
     return "API rate limit reached. Please wait a moment and try again.";
-  return "An unexpected error occurred during AI analysis. Please try again.";
+  return "An unexpected error occurred during AI analysis. Showing simulated route guidance.";
 }
