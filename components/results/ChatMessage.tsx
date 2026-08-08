@@ -12,7 +12,7 @@ export function ChatMessage({ message, onRetry }: { message: ConversationMessage
         className={cn(
           "max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-4 shadow-sm",
           isUser 
-            ? "bg-[var(--primary)]/15 text-blue-100 rounded-br-sm border border-[var(--primary)]/30"
+            ? "bg-white/[0.08] text-[var(--text-primary)] rounded-br-sm border border-white/[0.14]"
             : "bg-[var(--surface)] text-[var(--text-secondary)] rounded-bl-sm border border-[var(--border)]"
         )}
       >

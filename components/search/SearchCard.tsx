@@ -86,7 +86,7 @@ export function SearchCard() {
           hasError ? "ring-2 ring-[var(--danger)]/50" : ""
         }`}
       >
-        <div className="flex flex-col md:flex-row gap-2 relative bg-[var(--background-secondary)] rounded-xl overflow-hidden border border-[var(--border)] focus-within:border-[var(--primary)] focus-within:ring-[1.5px] focus-within:ring-[var(--primary)] transition-all duration-300">
+        <div className="flex flex-col md:flex-row gap-2 relative bg-[var(--background-secondary)] rounded-xl overflow-hidden border border-[var(--border)] focus-within:border-white/[0.22] focus-within:ring-[1.5px] focus-within:ring-white/[0.15] transition-all duration-300">
           <Input
             ref={inputRef}
             placeholder="I need to travel from Salt Lake to Park Street around 6 PM."

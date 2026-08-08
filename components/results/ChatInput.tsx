@@ -30,7 +30,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
   };
 
   return (
-    <div className="relative flex items-end gap-2 bg-[var(--background-secondary)] rounded-xl border border-[var(--border)] focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)] transition-all p-2">
+    <div className="relative flex items-end gap-2 bg-[var(--background-secondary)] rounded-xl border border-[var(--border)] focus-within:border-white/[0.22] focus-within:ring-1 focus-within:ring-white/[0.15] transition-all p-2">
       <textarea
         ref={textareaRef}
         value={value}
@@ -46,7 +46,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
         size="sm" 
         onClick={onSubmit} 
         disabled={isLoading || !value.trim()}
-        className="h-[36px] w-[36px] shrink-0 p-0 rounded-lg self-end mb-1 mr-1 flex items-center justify-center transition-all bg-[var(--primary)] hover:bg-blue-600 disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)]"
+        className="h-[36px] w-[36px] shrink-0 p-0 rounded-lg self-end mb-1 mr-1 flex items-center justify-center transition-all bg-[#0B0B0B] border border-white/[0.14] hover:bg-[#151515] hover:border-white/[0.22] hover:shadow-[0_0_12px_rgba(220,38,38,0.12)] disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:border-transparent"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </Button>
