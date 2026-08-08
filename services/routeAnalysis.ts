@@ -72,7 +72,7 @@ export async function analyzeRouteAction(
       },
       generationConfig: {
         temperature: 0.2, // low temperature for deterministic structured output
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
         responseMimeType: "application/json",
       },
     });
@@ -88,6 +88,12 @@ export async function analyzeRouteAction(
     ]);
 
     clearTimeout(timeoutId);
+
+    // Guard against truncated responses before attempting to parse
+    const finishReason = result.response.candidates?.[0]?.finishReason;
+    if (finishReason === "MAX_TOKENS") {
+      throw new Error("Gemini response was truncated (MAX_TOKENS). Response may be too long.");
+    }
 
     rawText = result.response.text();
 
@@ -117,9 +123,6 @@ export async function analyzeRouteAction(
       console.error("\n[SafeRoute AI] Route Analysis Error");
       console.error("Message:", msg);
       console.error("Phase:", classifyErrorPhase(msg));
-      if (rawText) {
-        console.error("Raw AI Text:", rawText);
-      }
       if (stack) console.error("Stack:", stack);
       console.error("─".repeat(60) + "\n");
     }

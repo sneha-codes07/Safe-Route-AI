@@ -77,7 +77,7 @@ export async function chatFollowUpAction(
       history,
       generationConfig: {
         temperature: 0.4,
-        maxOutputTokens: 512,
+        maxOutputTokens: 2048,
       },
     });
 
